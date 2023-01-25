@@ -41,7 +41,7 @@ vector<string> SplitIntoWords(const string& text) {
         words.push_back(word);
     }
 
-    return words;
+    return words; 
 }
 
 
