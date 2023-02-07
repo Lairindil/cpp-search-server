@@ -97,16 +97,8 @@ public:
         return matched_documents;
     }
 
-    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status = DocumentStatus::ACTUAL) const {
-        switch (status) {
-        case DocumentStatus::IRRELEVANT:
-            return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating) {return status == DocumentStatus::IRRELEVANT; });
-        case DocumentStatus::BANNED:
-            return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating) {return status == DocumentStatus::BANNED; });
-        case DocumentStatus::REMOVED:
-            return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating) {return status == DocumentStatus::REMOVED; });
-        default: return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating) {return status == DocumentStatus::ACTUAL; });
-        }
+    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus user_status = DocumentStatus::ACTUAL) const {
+            return FindTopDocuments(raw_query, [user_status](int document_id, DocumentStatus status, int rating) {return status == user_status; });
     }
 
     int GetDocumentCount() const {
