@@ -87,7 +87,8 @@ public:
 
         sort(matched_documents.begin(), matched_documents.end(),
             [](const Document& lhs, const Document& rhs) {
-                if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+                double EPSILON = 1e-6;
+                if (abs(lhs.relevance - rhs.relevance) < EPSILON) {
                     return lhs.rating > rhs.rating;
                 }
                 else {
@@ -320,17 +321,48 @@ void TestExcludeStopWordsFromAddedDocumentContent() {
 Разместите код остальных тестов здесь
 */
 void TestAddDocument() {
-    const int doc_id = 7;
-    const string content = "today is the day"s;
-    const vector<int> ratings = {1, 2, 3};
+    const int doc_id_1 = 7;
+    const string content_1 = "today is the day"s;
+    const vector<int> ratings_1 = {1, 2, 3};
+    
+    const int doc_id_2 = 10;
+    const string content_2 = "wonderful"s;
+    const vector<int> ratings_2 = {2, 4, 3};
+    
+    const int doc_id_3 = 3;
+    const string content_3 = "best"s;
+    const vector<int> ratings_3 = {0, -2, 3};
+    
+    const int doc_id_4 = 40;
+    const string content_4 = "world"s;
+    const vector<int> ratings_4 = {4, 1, 5};
     
     {
         SearchServer server;
-        server.AddDocument(doc_id, content,  DocumentStatus::ACTUAL, ratings);
-        const auto found_docs = server.FindTopDocuments("today");
-        ASSERT_EQUAL(found_docs.size(), 1u);
-        const Document& doc0 = found_docs[0];
-        ASSERT_EQUAL(doc0.id, doc_id);
+        server.AddDocument(doc_id_1, content_1,  DocumentStatus::ACTUAL, ratings_1);
+        server.AddDocument(doc_id_2, content_2,  DocumentStatus::ACTUAL, ratings_2);
+        server.AddDocument(doc_id_3, content_3,  DocumentStatus::ACTUAL, ratings_3);
+        server.AddDocument(doc_id_4, content_4,  DocumentStatus::ACTUAL, ratings_4);
+    
+        const auto found_docs_1 = server.FindTopDocuments("today"s);
+        ASSERT_EQUAL(found_docs_1.size(), 1u);
+        const Document& doc1 = found_docs_1[0];
+        ASSERT_EQUAL(doc1.id, doc_id_1);
+        
+        const auto found_docs_2 = server.FindTopDocuments("wonderful"s);
+        ASSERT_EQUAL(found_docs_2.size(), 1u);
+        const Document& doc2 = found_docs_2[0];
+        ASSERT_EQUAL(doc2.id, doc_id_2);
+        
+        const auto found_docs_3 = server.FindTopDocuments("best"s);
+        ASSERT_EQUAL(found_docs_3.size(), 1u);
+        const Document& doc3 = found_docs_3[0];
+        ASSERT_EQUAL(doc3.id, doc_id_3);
+        
+        const auto found_docs_4 = server.FindTopDocuments("world"s);
+        ASSERT_EQUAL(found_docs_4.size(), 1u);
+        const Document& doc4 = found_docs_4[0];
+        ASSERT_EQUAL(doc4.id, doc_id_4);
     }
 }
 
@@ -487,16 +519,24 @@ void TestDocumentStatus() {
     SearchServer server;
     
     server.AddDocument(0, "today is the day"s, DocumentStatus::ACTUAL, {8, -3});
- //   server.AddDocument(1, "It is a wonderful world"s, DocumentStatus::IRRELEVANT, {7, 2, 7});
+    server.AddDocument(1, "It is a wonderful world"s, DocumentStatus::IRRELEVANT, {7, 2, 7});
     server.AddDocument(2, "the best days"s, DocumentStatus::ACTUAL, {5, -12, 2, 1});
-//    server.AddDocument(3, "It is a wonderful day"s, DocumentStatus::BANNED, {9});
+    server.AddDocument(3, "It is a wonderful day"s, DocumentStatus::BANNED, {9});
     server.AddDocument(4, "It is a not a wonderful day"s, DocumentStatus::REMOVED, {-100});
 
     auto found_docs = server.FindTopDocuments("today is best day"s,DocumentStatus::ACTUAL);
     ASSERT_EQUAL(found_docs.size(), 2u);
     
+    found_docs = server.FindTopDocuments("today is best day"s,DocumentStatus::IRRELEVANT);
+    ASSERT_EQUAL(found_docs.size(), 1u);
+    
+    found_docs = server.FindTopDocuments("today is best day"s,DocumentStatus::BANNED);
+    ASSERT_EQUAL(found_docs.size(), 1u);
+    
     found_docs = server.FindTopDocuments("today is best day"s,DocumentStatus::REMOVED);
     ASSERT_EQUAL(found_docs.size(), 1u);
+    
+    
 }
 
 void TestRelevance() {
@@ -519,7 +559,9 @@ void TestRelevance() {
         server.AddDocument(0, "today today today"s, DocumentStatus::ACTUAL, {8});
         server.AddDocument(1, "It is a wonderful day"s, DocumentStatus::ACTUAL, {9});
         auto found_docs = server.FindTopDocuments("today"s);
-        ASSERT((found_docs[0].relevance - 0.693147) < 1e-6 );
+        
+        double EPSILON = 1e-6;
+        ASSERT(abs(found_docs[0].relevance - 0.693147) < EPSILON);
     }
 }
 
