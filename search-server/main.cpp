@@ -6,6 +6,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <numeric>
 
 using namespace std;
 
@@ -82,22 +83,19 @@ public:
     template <typename StringContainer>
     explicit SearchServer(const StringContainer& stop_words)
         : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
-            for (const string& word : stop_words_) {
-                if (!IsValidWord(word)) {
+
+            if (!none_of(stop_words.begin(), stop_words.end(), [](const string word) { return !IsValidWord(word);}))
+            {
                     throw invalid_argument("Недопустимые символы во множестве стоп-слов"s);
-                }
             }
     }
+    
 
     explicit SearchServer(const string& stop_words_text)
         : SearchServer(
             SplitIntoWords(stop_words_text))  // Invoke delegating constructor from string container
     {
-        for (const string& word : stop_words_) {
-            if (!IsValidWord(word)) {
-                throw invalid_argument("Недопустимые символы во множестве стоп-слов"s);
-            }
-        }
+       
     }
 
     void AddDocument(int document_id, const string& document, DocumentStatus status,
@@ -123,24 +121,22 @@ public:
     template <typename DocumentPredicate>
     vector<Document> FindTopDocuments(const string& raw_query,
                                       DocumentPredicate document_predicate) const {
-        if (const auto query = ParseQuery(raw_query); query) {
-            auto matched_documents = FindAllDocuments(query.value(), document_predicate);
+        const auto query = ParseQuery(raw_query);
+        auto matched_documents = FindAllDocuments(query, document_predicate);
             
-            sort(matched_documents.begin(), matched_documents.end(),
-                [](const Document& lhs, const Document& rhs) {
-                if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
-                    return lhs.rating > rhs.rating;
-                } else {
-                    return lhs.relevance > rhs.relevance;
-                }
-            });
-            if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
-                matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
+        sort(matched_documents.begin(), matched_documents.end(),
+            [](const Document& lhs, const Document& rhs) {
+            double EPSILON = 1e-6;
+            if (abs(lhs.relevance - rhs.relevance) < EPSILON) {
+                return lhs.rating > rhs.rating;
+            } else {
+                return lhs.relevance > rhs.relevance;
             }
-            return matched_documents;
-        } else {
-            throw invalid_argument ("Ошибка в поисковом запросе"s);
+        });
+        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
+            matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
         }
+        return matched_documents;
     }
 
     vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status) const {
@@ -163,29 +159,26 @@ public:
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
         
-        if (const auto query = ParseQuery(raw_query); query) {
-            vector<string> matched_words;
-            for (const string& word : query->plus_words) {
-                if (word_to_document_freqs_.count(word) == 0) {
-                    continue;
-                }
-                if (word_to_document_freqs_.at(word).count(document_id)) {
-                    matched_words.push_back(word);
-                }
+        const auto query = ParseQuery(raw_query);
+        vector<string> matched_words;
+        for (const string& word : query.plus_words) {
+            if (word_to_document_freqs_.count(word) == 0) {
+                continue;
             }
-            for (const string& word : query->minus_words) {
-                if (word_to_document_freqs_.count(word) == 0) {
-                    continue;
-                }
-                if (word_to_document_freqs_.at(word).count(document_id)) {
-                    matched_words.clear();
-                    break;
-                }
+            if (word_to_document_freqs_.at(word).count(document_id)) {
+                matched_words.push_back(word);
             }
-            return tuple(matched_words, documents_.at(document_id).status);;
-        } else {
-            throw invalid_argument ("Ошибка в поисковом запросе"s);
         }
+        for (const string& word : query.minus_words) {
+            if (word_to_document_freqs_.count(word) == 0) {
+                continue;
+            }
+            if (word_to_document_freqs_.at(word).count(document_id)) {
+                matched_words.clear();
+                break;
+            }
+        }
+        return tuple(matched_words, documents_.at(document_id).status);;
     }
     
     int GetDocumentId(int index) const {
@@ -235,10 +228,7 @@ private:
         if (ratings.empty()) {
             return 0;
         }
-        int rating_sum = 0;
-        for (const int rating : ratings) {
-            rating_sum += rating;
-        }
+        int rating_sum = accumulate(ratings.begin(), ratings.end(), 0);
         return rating_sum / static_cast<int>(ratings.size());
     }
 
@@ -248,15 +238,21 @@ private:
         bool is_stop;
     };
 
-    optional<QueryWord> ParseQueryWord(string text) const {
+    QueryWord ParseQueryWord(string text) const {
         bool is_minus = false;
         // Word shouldn't be empty
         if (text[0] == '-') {
             is_minus = true;
             text = text.substr(1);
         }
-        if (!IsValidWord(text) || text.size() == 0 || text[0] == '-') {
-            return nullopt;
+        if (!IsValidWord(text)) {
+            throw invalid_argument ("В поисковом запросе \""s + text + "\" есть недопустимые символы с кодами от 0 до 31"s);
+        }
+        if (text.size() == 0) {
+            throw invalid_argument ("Отсутствие текста после символа «минус» в поисковом запросе"s);
+        }
+        if (text[0] == '-') {
+            throw invalid_argument ("Наличие более чем одного минуса перед словами, которых не должно быть в искомых документах"s);
         }
         QueryWord query_word = {text, is_minus, IsStopWord(text)};
         return  query_word;
@@ -268,18 +264,15 @@ private:
         set<string> minus_words;
     };
 
-    optional<Query> ParseQuery(const string& text) const {
+    Query ParseQuery(const string& text) const {
         Query query;
         for (const string& word : SplitIntoWords(text)) {
-            if (const auto query_word = ParseQueryWord(word); !query_word) {
-                return nullopt;
-            } else {
-                if (!query_word->is_stop) {
-                    if (query_word->is_minus) {
-                        query.minus_words.insert(query_word->data);
-                    } else {
-                        query.plus_words.insert(query_word->data);
-                    }
+            const auto query_word = ParseQueryWord(word);
+            if (!query_word.is_stop) {
+                if (query_word.is_minus) {
+                        query.minus_words.insert(query_word.data);
+                } else {
+                        query.plus_words.insert(query_word.data);
                 }
             }
         }
