@@ -17,3 +17,4 @@ std::set<std::string> MakeUniqueNonEmptyStrings(const StringContainer& strings) 
     }
     return non_empty_strings;
 }
+
