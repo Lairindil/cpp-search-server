@@ -1,5 +1,6 @@
 #include "search_server.h"
 #include "string_processing.h"
+#include "log_duration.h"
 
 using namespace std;
 
@@ -21,9 +22,11 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
         const double inv_word_count = 1.0 / words->size();
         for (const string& word : *words) {
             word_to_document_freqs_[word][document_id] += inv_word_count;
+            word_frequencies_[document_id][word] += inv_word_count;
         }
         documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
         documents_ids_.push_back(document_id);
+
     } else {
         throw invalid_argument ("Документ не был добавлен, так как содержит спецсимволы"s);
     }
@@ -48,7 +51,7 @@ int SearchServer::GetDocumentCount() const {
 }
 
 tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& raw_query, int document_id) const {
-    
+
     const auto query = ParseQuery(raw_query);
     vector<string> matched_words;
     for (const string& word : query.plus_words) {
@@ -72,12 +75,49 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& 
 }
 
 
-int SearchServer::GetDocumentId(int index) const {
-    if (index < 0 || index > static_cast<int>(documents_ids_.size())) {
-        throw out_of_range("Индекс переданного документа выходит за пределы допустимого диапазона (0; количество документов)"s);
-    } else {
-        return documents_ids_[index];
+//int SearchServer::GetDocumentId(int index) const {
+//    if (index < 0 || index > static_cast<int>(documents_ids_.size())) {
+//        throw out_of_range("Индекс переданного документа выходит за пределы допустимого диапазона (0; количество документов)"s);
+//    } else {
+//        return documents_ids_[index];
+//    }
+//}
+
+vector<int>::iterator SearchServer::begin() {
+    return documents_ids_.begin();
+}
+
+vector<int>::iterator SearchServer::end() {
+    return documents_ids_.end();
+}
+
+const map<string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+    if (word_frequencies_.count(document_id) == 0) {
+        return empty_map_;
     }
+    return word_frequencies_.at(document_id);
+}
+
+void SearchServer::RemoveDocument(int document_id) {
+    //do we have doc on server?
+    if (count(documents_ids_.begin(), documents_ids_.end(), document_id) == 0) {
+        return;
+    }
+
+    //remove from documents
+    documents_.erase(document_id);
+    
+    //remove from documents_ids_
+    auto it_to_remove = find(documents_ids_.begin(), documents_ids_.end(), document_id);
+    documents_ids_.erase(it_to_remove);
+    
+    for(auto& [word, freq] : GetWordFrequencies(document_id)) {
+        word_to_document_freqs_[word].erase(document_id);
+    }
+    
+    //remove from word_frequencies
+    word_frequencies_.erase(document_id);
+
 }
 
 

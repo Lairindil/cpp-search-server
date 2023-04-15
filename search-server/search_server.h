@@ -13,6 +13,7 @@
 #include "document.h"
 #include "read_input_functions.h"
 #include "string_processing.h"
+#include "log_duration.h"
 
 
 using namespace std::string_literals;
@@ -44,8 +45,15 @@ public:
     std::tuple<std::vector<std::string>, DocumentStatus> MatchDocument(const std::string& raw_query, int document_id) const;
     
     
-    int GetDocumentId(int index) const;
-
+   // int GetDocumentId(int index) const;
+    std::vector<int>::iterator begin();
+    std::vector<int>::iterator end();
+    
+    const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
+    
+    void RemoveDocument(int document_id);
+    
+    
 private:
     struct DocumentData {
         int rating;
@@ -53,6 +61,13 @@ private:
     };
     const std::set<std::string> stop_words_;
     std::map<std::string, std::map<int, double>> word_to_document_freqs_;
+    
+    //doc_id to word/freq
+    std::map<int, std::map<std::string, double>> word_frequencies_;
+    
+    std::map<std::string, double> empty_map_;
+    
+    
     std::map<int, DocumentData> documents_;
     
     std::vector<int> documents_ids_;
