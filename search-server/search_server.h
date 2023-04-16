@@ -46,8 +46,8 @@ public:
     
     
    // int GetDocumentId(int index) const;
-    std::vector<int>::iterator begin();
-    std::vector<int>::iterator end();
+    std::set<int>::iterator begin();
+    std::set<int>::iterator end();
     
     const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
     
@@ -65,12 +65,9 @@ private:
     //doc_id to word/freq
     std::map<int, std::map<std::string, double>> word_frequencies_;
     
-    std::map<std::string, double> empty_map_;
-    
-    
     std::map<int, DocumentData> documents_;
     
-    std::vector<int> documents_ids_;
+    std::set<int> documents_ids_;
 
     static bool IsValidWord(const std::string& word);
     

@@ -25,7 +25,7 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
             word_frequencies_[document_id][word] += inv_word_count;
         }
         documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
-        documents_ids_.push_back(document_id);
+        documents_ids_.insert(document_id);
 
     } else {
         throw invalid_argument ("Документ не был добавлен, так как содержит спецсимволы"s);
@@ -83,33 +83,33 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& 
 //    }
 //}
 
-vector<int>::iterator SearchServer::begin() {
+set<int>::iterator SearchServer::begin() {
     return documents_ids_.begin();
 }
 
-vector<int>::iterator SearchServer::end() {
+set<int>::iterator SearchServer::end() {
     return documents_ids_.end();
 }
 
 const map<string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+    static std::map<std::string, double> empty_map;
     if (word_frequencies_.count(document_id) == 0) {
-        return empty_map_;
+        return empty_map;
     }
     return word_frequencies_.at(document_id);
 }
 
 void SearchServer::RemoveDocument(int document_id) {
     //do we have doc on server?
-    if (count(documents_ids_.begin(), documents_ids_.end(), document_id) == 0) {
+    auto it_to_remove = find(documents_ids_.begin(), documents_ids_.end(), document_id);
+    if (it_to_remove == documents_ids_.end()) {
         return;
     }
+    //remove from documents_ids_
+    documents_ids_.erase(it_to_remove);
 
     //remove from documents
     documents_.erase(document_id);
-    
-    //remove from documents_ids_
-    auto it_to_remove = find(documents_ids_.begin(), documents_ids_.end(), document_id);
-    documents_ids_.erase(it_to_remove);
     
     for(auto& [word, freq] : GetWordFrequencies(document_id)) {
         word_to_document_freqs_[word].erase(document_id);
