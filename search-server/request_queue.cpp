@@ -9,7 +9,7 @@ RequestQueue::RequestQueue(const SearchServer& search_server)
     : search_server_(search_server) {
 }
 
-vector<Document> RequestQueue::AddFindRequest(const string& raw_query, DocumentStatus status) {
+vector<Document> RequestQueue::AddFindRequest(std::string_view raw_query, DocumentStatus status) {
     
     QueryResult request;
     request.result = search_server_.FindTopDocuments(raw_query);
@@ -18,7 +18,7 @@ vector<Document> RequestQueue::AddFindRequest(const string& raw_query, DocumentS
 }
 
 
-vector<Document> RequestQueue::AddFindRequest(const string& raw_query) {
+vector<Document> RequestQueue::AddFindRequest(std::string_view raw_query) {
     QueryResult request;
     request.result = search_server_.FindTopDocuments(raw_query);
     ParseRequest(request);
